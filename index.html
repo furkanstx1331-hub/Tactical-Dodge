@@ -2,192 +2,198 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Dungeon Dodge PRO</title>
+<title>Tactical Dodge </title>
 <style>
 body{
-margin:0;
-background:#0f1117;
-display:flex;
-flex-direction:column;
-align-items:center;
-font-family:Arial;
-color:white;
-overflow:hidden;
+    margin:0;
+    background:#111;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    font-family:Arial;
+    color:white;
 }
-canvas{
-background:#181c24;
-border:2px solid #ff5555;
-box-shadow:0 0 25px #ff3333;
+
+#gameContainer{
+    display:flex;
+    gap:30px;
 }
-.info{
-margin:10px;
-display:flex;
-gap:25px;
+
+#game{
+    background:#1b1b1b;
+    border:3px solid #00ffcc;
+}
+
+#ui{
+    width:200px;
+}
+
+h2{
+    margin-top:0;
+}
+
+button{
+    padding:10px;
+    width:100%;
+    background:#00ffcc;
+    border:none;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#00ccaa;
 }
 </style>
 </head>
 <body>
 
-<h2>⚔ Dungeon Dodge PRO</h2>
-<div class="info">
-<div>HP: <span id="hp">3</span></div>
-<div>Wave: <span id="wave">1</span></div>
-<div>Score: <span id="score">0</span></div>
-</div>
+<div id="gameContainer">
+    <canvas id="game" width="500" height="500"></canvas>
 
-<canvas id="game" width="700" height="450"></canvas>
+    <div id="ui">
+        <h2>SKOR</h2>
+        <h1 id="score">0</h1>
+        <p>Altın topla.<br>Düşmanlara değme.</p>
+        <button onclick="restart()">Yeniden Başlat</button>
+    </div>
+</div>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let keys = {};
+const gridSize = 5;
+const cellSize = canvas.width / gridSize;
 
-let player = {
-x:350,
-y:225,
-r:14,
-speed:3.5,
-hp:3,
-dashCD:0,
-invul:0
-};
+let player;
+let gold;
+let enemies = [];
+let score = 0;
+let gameSpeed = 1000;
+let gameInterval;
+let enemyInterval;
 
-let enemies=[];
-let wave=1;
-let score=0;
-let spawnTimer=0;
-let gameOver=false;
+function init(){
+    player = {x:2,y:2};
+    enemies = [];
+    score = 0;
+    document.getElementById("score").innerText = score;
+    spawnGold();
+    clearInterval(gameInterval);
+    clearInterval(enemyInterval);
+    gameSpeed = 1000;
+    gameInterval = setInterval(updateEnemies, gameSpeed);
+    enemyInterval = setInterval(spawnEnemy, 2000);
+    draw();
+}
 
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
+function spawnGold(){
+    gold = {
+        x: Math.floor(Math.random()*gridSize),
+        y: Math.floor(Math.random()*gridSize)
+    };
+}
 
 function spawnEnemy(){
-let type=Math.random();
-let speed=1.5+wave*0.15;
-let size=12;
+    const edge = Math.floor(Math.random()*4);
+    let enemy = {x:0,y:0};
 
-if(type<0.25) speed*=2;       // hızlı
-if(type>0.75) size=22;       // tank
+    if(edge === 0){ enemy.x=0; enemy.y=Math.floor(Math.random()*gridSize); }
+    if(edge === 1){ enemy.x=gridSize-1; enemy.y=Math.floor(Math.random()*gridSize); }
+    if(edge === 2){ enemy.y=0; enemy.x=Math.floor(Math.random()*gridSize); }
+    if(edge === 3){ enemy.y=gridSize-1; enemy.x=Math.floor(Math.random()*gridSize); }
 
-let side=Math.floor(Math.random()*4);
-let x,y;
-
-if(side===0){x=0;y=Math.random()*450;}
-if(side===1){x=700;y=Math.random()*450;}
-if(side===2){x=Math.random()*700;y=0;}
-if(side===3){x=Math.random()*700;y=450;}
-
-enemies.push({x,y,r:size,speed});
+    enemies.push(enemy);
 }
 
-function update(){
+function updateEnemies(){
+    enemies.forEach(enemy=>{
+        const dir = Math.floor(Math.random()*4);
+        if(dir===0 && enemy.x>0) enemy.x--;
+        if(dir===1 && enemy.x<gridSize-1) enemy.x++;
+        if(dir===2 && enemy.y>0) enemy.y--;
+        if(dir===3 && enemy.y<gridSize-1) enemy.y++;
+    });
 
-if(gameOver) return;
-
-// Hareket
-let dx=0,dy=0;
-if(keys["ArrowUp"]) dy-=1;
-if(keys["ArrowDown"]) dy+=1;
-if(keys["ArrowLeft"]) dx-=1;
-if(keys["ArrowRight"]) dx+=1;
-
-let len=Math.hypot(dx,dy);
-if(len>0){
-dx/=len; dy/=len;
+    checkCollision();
+    draw();
 }
 
-let currentSpeed=player.speed;
-
-// DASH
-if(keys["Shift"] && player.dashCD<=0){
-currentSpeed=9;
-player.dashCD=80;
-player.invul=40;
-}
-
-player.x+=dx*currentSpeed;
-player.y+=dy*currentSpeed;
-
-if(player.dashCD>0) player.dashCD--;
-if(player.invul>0) player.invul--;
-
-// Arena sınır
-player.x=Math.max(player.r,Math.min(700-player.r,player.x));
-player.y=Math.max(player.r,Math.min(450-player.r,player.y));
-
-// Enemy hareket
-enemies.forEach((e,i)=>{
-let dx=player.x-e.x;
-let dy=player.y-e.y;
-let dist=Math.hypot(dx,dy);
-e.x+=dx/dist*e.speed;
-e.y+=dy/dist*e.speed;
-
-if(dist < e.r + player.r){
-if(player.invul<=0){
-player.hp--;
-player.invul=60;
-if(player.hp<=0){
-gameOver=true;
-}
-}
-}
-});
-
-// Spawn sistemi
-spawnTimer++;
-if(spawnTimer > 50 - wave*2){
-spawnEnemy();
-spawnTimer=0;
-}
-
-// Wave artışı
-if(score > wave*200){
-wave++;
-}
-
-// Score zamanla artar
-score++;
+function checkCollision(){
+    for(let enemy of enemies){
+        if(enemy.x===player.x && enemy.y===player.y){
+            alert("GAME OVER\nSkor: "+score);
+            init();
+        }
+    }
 }
 
 function draw(){
-ctx.fillStyle="#181c24";
-ctx.fillRect(0,0,700,450);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-// Player
-ctx.beginPath();
-ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
-ctx.fillStyle=player.invul>0 ? "#00ffff" : "#00ff99";
-ctx.fill();
+    // Grid çiz
+    ctx.strokeStyle="#333";
+    for(let i=0;i<gridSize;i++){
+        for(let j=0;j<gridSize;j++){
+            ctx.strokeRect(i*cellSize,j*cellSize,cellSize,cellSize);
+        }
+    }
 
-// Enemy
-ctx.fillStyle="#ff4444";
-enemies.forEach(e=>{
-ctx.beginPath();
-ctx.arc(e.x,e.y,e.r,0,Math.PI*2);
-ctx.fill();
+    // Gold
+    ctx.fillStyle="gold";
+    ctx.beginPath();
+    ctx.arc(
+        gold.x*cellSize + cellSize/2,
+        gold.y*cellSize + cellSize/2,
+        cellSize/4,
+        0,
+        Math.PI*2
+    );
+    ctx.fill();
+
+    // Player
+    ctx.fillStyle="#00ffcc";
+    ctx.fillRect(player.x*cellSize+10,player.y*cellSize+10,cellSize-20,cellSize-20);
+
+    // Enemies
+    ctx.fillStyle="red";
+    enemies.forEach(enemy=>{
+        ctx.fillRect(enemy.x*cellSize+10,enemy.y*cellSize+10,cellSize-20,cellSize-20);
+    });
+}
+
+document.addEventListener("keydown", e=>{
+    if(e.key==="w"||e.key==="ArrowUp"){ if(player.y>0) player.y--; }
+    if(e.key==="s"||e.key==="ArrowDown"){ if(player.y<gridSize-1) player.y++; }
+    if(e.key==="a"||e.key==="ArrowLeft"){ if(player.x>0) player.x--; }
+    if(e.key==="d"||e.key==="ArrowRight"){ if(player.x<gridSize-1) player.x++; }
+
+    if(player.x===gold.x && player.y===gold.y){
+        score++;
+        document.getElementById("score").innerText = score;
+        spawnGold();
+
+        // Zorluk artışı
+        if(gameSpeed>300){
+            gameSpeed -= 100;
+            clearInterval(gameInterval);
+            gameInterval = setInterval(updateEnemies, gameSpeed);
+        }
+    }
+
+    checkCollision();
+    draw();
 });
 
-if(gameOver){
-ctx.fillStyle="white";
-ctx.font="48px Arial";
-ctx.fillText("GAME OVER",240,220);
+function restart(){
+    init();
 }
 
-document.getElementById("hp").innerText=player.hp;
-document.getElementById("wave").innerText=wave;
-document.getElementById("score").innerText=score;
-}
-
-function loop(){
-update();
-draw();
-requestAnimationFrame(loop);
-}
-
-loop();
+init();
 </script>
+
 </body>
 </html>
 
