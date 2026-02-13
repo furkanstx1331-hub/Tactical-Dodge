@@ -2,82 +2,81 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Dungeon Dodge Arena</title>
+<title>Dungeon Dodge PRO</title>
 <style>
 body{
 margin:0;
-background:#0c0f14;
+background:#0f1117;
 display:flex;
 flex-direction:column;
 align-items:center;
 font-family:Arial;
 color:white;
+overflow:hidden;
 }
 canvas{
-background:#151a22;
-border:2px solid #ff4444;
-box-shadow:0 0 20px #ff4444;
+background:#181c24;
+border:2px solid #ff5555;
+box-shadow:0 0 25px #ff3333;
 }
 .info{
 margin:10px;
 display:flex;
-gap:20px;
+gap:25px;
 }
 </style>
 </head>
 <body>
 
-<h2>🗡 Dungeon Dodge Arena</h2>
+<h2>⚔ Dungeon Dodge PRO</h2>
 <div class="info">
 <div>HP: <span id="hp">3</span></div>
 <div>Wave: <span id="wave">1</span></div>
 <div>Score: <span id="score">0</span></div>
 </div>
 
-<canvas id="game" width="600" height="400"></canvas>
+<canvas id="game" width="700" height="450"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 let keys = {};
+
 let player = {
-x:300,y:200,
-r:12,
-speed:3,
+x:350,
+y:225,
+r:14,
+speed:3.5,
 hp:3,
-dashCooldown:0,
-invincible:0
+dashCD:0,
+invul:0
 };
 
-let enemies = [];
-let wave = 1;
-let score = 0;
-let spawnTimer = 0;
-let gameOver = false;
+let enemies=[];
+let wave=1;
+let score=0;
+let spawnTimer=0;
+let gameOver=false;
 
-document.addEventListener("keydown",e=>{
-keys[e.key]=true;
-});
-document.addEventListener("keyup",e=>{
-keys[e.key]=false;
-});
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
 function spawnEnemy(){
-let type = Math.random();
-let speed = 1.2 + wave*0.1;
-let size = 12;
+let type=Math.random();
+let speed=1.5+wave*0.15;
+let size=12;
 
-if(type<0.3) speed*=1.8;        // hızlı
-if(type>0.7) size=20;          // tank
+if(type<0.25) speed*=2;       // hızlı
+if(type>0.75) size=22;       // tank
 
-let side = Math.floor(Math.random()*4);
+let side=Math.floor(Math.random()*4);
 let x,y;
 
-if(side===0){x=0;y=Math.random()*400;}
-if(side===1){x=600;y=Math.random()*400;}
-if(side===2){x=Math.random()*600;y=0;}
-if(side===3){x=Math.random()*600;y=400;}
+if(side===0){x=0;y=Math.random()*450;}
+if(side===1){x=700;y=Math.random()*450;}
+if(side===2){x=Math.random()*700;y=0;}
+if(side===3){x=Math.random()*700;y=450;}
 
 enemies.push({x,y,r:size,speed});
 }
@@ -86,35 +85,49 @@ function update(){
 
 if(gameOver) return;
 
-if(keys["ArrowUp"]) player.y-=player.speed;
-if(keys["ArrowDown"]) player.y+=player.speed;
-if(keys["ArrowLeft"]) player.x-=player.speed;
-if(keys["ArrowRight"]) player.x+=player.speed;
+// Hareket
+let dx=0,dy=0;
+if(keys["ArrowUp"]) dy-=1;
+if(keys["ArrowDown"]) dy+=1;
+if(keys["ArrowLeft"]) dx-=1;
+if(keys["ArrowRight"]) dx+=1;
 
-// DASH
-if(keys["Shift"] && player.dashCooldown<=0){
-player.speed=8;
-player.dashCooldown=60;
-player.invincible=30;
-}else{
-player.speed=3;
+let len=Math.hypot(dx,dy);
+if(len>0){
+dx/=len; dy/=len;
 }
 
-if(player.dashCooldown>0) player.dashCooldown--;
-if(player.invincible>0) player.invincible--;
+let currentSpeed=player.speed;
 
-// ENEMY MOVE
+// DASH
+if(keys["Shift"] && player.dashCD<=0){
+currentSpeed=9;
+player.dashCD=80;
+player.invul=40;
+}
+
+player.x+=dx*currentSpeed;
+player.y+=dy*currentSpeed;
+
+if(player.dashCD>0) player.dashCD--;
+if(player.invul>0) player.invul--;
+
+// Arena sınır
+player.x=Math.max(player.r,Math.min(700-player.r,player.x));
+player.y=Math.max(player.r,Math.min(450-player.r,player.y));
+
+// Enemy hareket
 enemies.forEach((e,i)=>{
-let dx = player.x - e.x;
-let dy = player.y - e.y;
-let dist = Math.hypot(dx,dy);
-e.x += dx/dist * e.speed;
-e.y += dy/dist * e.speed;
+let dx=player.x-e.x;
+let dy=player.y-e.y;
+let dist=Math.hypot(dx,dy);
+e.x+=dx/dist*e.speed;
+e.y+=dy/dist*e.speed;
 
 if(dist < e.r + player.r){
-if(player.invincible<=0){
+if(player.invul<=0){
 player.hp--;
-player.invincible=40;
+player.invul=60;
 if(player.hp<=0){
 gameOver=true;
 }
@@ -122,33 +135,33 @@ gameOver=true;
 }
 });
 
-// SPAWN
+// Spawn sistemi
 spawnTimer++;
-if(spawnTimer > 60 - wave*2){
+if(spawnTimer > 50 - wave*2){
 spawnEnemy();
 spawnTimer=0;
 }
 
-// WAVE ARTIŞ
-if(score > wave*50){
+// Wave artışı
+if(score > wave*200){
 wave++;
 }
 
-// SCORE
+// Score zamanla artar
 score++;
 }
 
 function draw(){
-ctx.fillStyle="#151a22";
-ctx.fillRect(0,0,600,400);
+ctx.fillStyle="#181c24";
+ctx.fillRect(0,0,700,450);
 
 // Player
 ctx.beginPath();
 ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
-ctx.fillStyle=player.invincible>0 ? "#00ffff" : "#00ff88";
+ctx.fillStyle=player.invul>0 ? "#00ffff" : "#00ff99";
 ctx.fill();
 
-// Enemies
+// Enemy
 ctx.fillStyle="#ff4444";
 enemies.forEach(e=>{
 ctx.beginPath();
@@ -158,8 +171,8 @@ ctx.fill();
 
 if(gameOver){
 ctx.fillStyle="white";
-ctx.font="40px Arial";
-ctx.fillText("GAME OVER",200,200);
+ctx.font="48px Arial";
+ctx.fillText("GAME OVER",240,220);
 }
 
 document.getElementById("hp").innerText=player.hp;
@@ -177,4 +190,4 @@ loop();
 </script>
 </body>
 </html>
->
+
